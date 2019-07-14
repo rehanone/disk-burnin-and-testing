@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 ########################################################################
 #
 # disk-burnin.sh
@@ -124,24 +124,79 @@
 # 
 ########################################################################
 
-if [ $# -ne 1 ]; then
-  echo "Error: not enough arguments!"
-  echo "Usage is: $0 drive_device_specifier"
-  exit 2
+#if [ $# -ne 1 ]; then
+#  echo "Error: not enough arguments!"
+#  echo "Usage is: $0 drive_device_specifier"
+#  exit 2
+#fi
+
+readonly SCRIPT_NAME=$(basename -- "$0")
+
+readonly bold=$(tput bold)
+readonly normal=$(tput sgr0)
+
+readonly black=$(tput setaf 0)
+readonly red=$(tput setaf 1)
+readonly green=$(tput setaf 2)
+readonly yellow=$(tput setaf 3)
+readonly blue=$(tput setaf 4)
+readonly magenta=$(tput setaf 5)
+readonly cyan=$(tput setaf 6)
+readonly white=$(tput setaf 7)
+
+display_usage() {
+cat <<EOF
+
+Usage: ${SCRIPT_NAME} [-r] <disk>
+
+${bold}-r${normal}|    Perform tests on the disk.
+${bold}-h${normal}|    Print this help message.
+
+Example 1: ${bold}${blue}By default the script runs in 'dry run mode' to check the sleep duration calculations and to insure that the sequence of commands suits your needs.${normal}
+ > ${bold}${SCRIPT_NAME} sda
+Example 2: ${bold}${blue}Perform tests on the disk.${normal}
+ > ${bold}${SCRIPT_NAME} -r sda
+
+EOF
+}
+
+while getopts "hr" OPTION ; do
+    case ${OPTION} in
+        r) run=true;;
+        h) display_usage; exit 1;;
+        \?) display_usage; exit 1;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+if  [[ ! "${run}" ]] ; then
+  Dry_Run=1;
+else
+  Dry_Run=0;
 fi
 
-Drive=$1
+
+Drive="${@}"
+
+if  [[ ! "${Drive}" ]] ; then
+  display_usage; exit 2;
+fi
+
 
 # Set Dry_Run to a non-zero value to test out the script without actually
 # running any tests: set it to zero when you are ready to burn-in disks.
 
-Dry_Run=1
+#Dry_Run=1
 
 # Directory specifiers for log and badblocks data files. Leave off the 
 # trailing slash:
 
-Log_Dir="."
-BB_Dir="."
+Log_Dir="/var/log/disk-burnin"
+BB_Dir="/var/log/disk-burnin"
+
+mkdir -p "${Log_Dir}"
+mkdir -p "${BB_Dir}"
 
 ########################################################################
 #
