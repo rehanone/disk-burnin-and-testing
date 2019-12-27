@@ -18,10 +18,10 @@
 #   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #
 #   2> Run times for large disks can take several days to complete, so it
-#      is a good idea to use tmux sessions to prevent mishaps. 
+#      is a good idea to use tmux sessions to prevent mishaps.
 #
 #   3> Must be run as 'root'.
-# 
+#
 #   4> Tests of large drives can take days to complete: use tmux!
 #
 # Performs these steps:
@@ -32,7 +32,7 @@
 #   4> Run SMART short test
 #   5> Run SMART extended test
 #
-# The script sleeps after starting each SMART test, using a duration 
+# The script sleeps after starting each SMART test, using a duration
 # based on the polling interval reported by the disk, after which the
 # script will poll the disk to verify the self-test has completed.
 #
@@ -42,10 +42,10 @@
 # You should monitor the burn-in progress and watch for errors, particularly
 # any errors reported by badblocks, or these SMART errors:
 #
-#   5 Reallocated_Sector_Ct   
-# 196 Reallocated_Event_Count 
-# 197 Current_Pending_Sector  
-# 198 Offline_Uncorrectable   
+#   5 Reallocated_Sector_Ct
+# 196 Reallocated_Event_Count
+# 197 Current_Pending_Sector
+# 198 Offline_Uncorrectable
 #
 # These indicate possible problems with the drive. You therefore may
 # wish to abort the remaining tests and proceed with an RMA exchange
@@ -57,28 +57,28 @@
 #
 # badblocks is invoked with a block size of 4096, the -wsv options, and
 # the -o option to instruct it to write the list of bad blocks found (if
-# any) to a file named 'burnin-[model]_[serial number].bb'. 
-# 
+# any) to a file named 'burnin-[model]_[serial number].bb'.
+#
 # The only required command-line argument is the device specifier, e.g.:
 #
-#   ./disk-burnin.sh sda 
+#   ./disk-burnin.sh sda
 #
 # ...will run the burn-in test on device /dev/sda
 #
 # You can run the script in 'dry run mode' (see below) to check the sleep
 # duration calculations and to insure that the sequence of commands suits
-# your needs. In 'dry runs' the script does not actually perform any 
+# your needs. In 'dry runs' the script does not actually perform any
 # SMART tests or invoke the sleep or badblocks programs. The script is
 # distributed with 'dry runs' enabled, so you will need to edit the
 # Dry_Run variable below, setting it to 0, in order to actually perform
 # tests on drives.
-# 
+#
 # Before using the script on FreeBSD systems (including FreeNAS) you must
 # first execute this sysctl command to alter the kernel's geometry debug
 # flags. This allows badblocks to write to the entire disk:
 #
 #   sysctl kern.geom.debugflags=0x10
-# 
+#
 # Tested under:
 #   FreeNAS 9.10.2 (FreeBSD 10.3-STABLE)
 #   Ubuntu Server 16.04.2 LTS
@@ -96,7 +96,7 @@
 # Uses: grep, pcregrep, awk, sed, tr, sleep, badblocks
 #
 # Written by Keith Nash, March 2017
-# 
+#
 # KN, 8 Apr 2017:
 #   Added minimum test durations because some devices don't return accurate values.
 #   Added code to clean up the log file, removing copyright notices, etc.
@@ -104,16 +104,16 @@
 #   Emit test results after tests instead of full 'smartctl -a' output.
 #   Emit full 'smartctl -x' output at the end of all testing.
 #   Minor changes to log output and formatting.
-# 
+#
 # KN, 12 May 2017:
 #   Added code to poll the disk and check for completed self-tests.
-# 
+#
 #   As noted above, some disks don't report accurate values for the short and extended
-#   self-test intervals, sometimes by a significant amount. The original approach using 
+#   self-test intervals, sometimes by a significant amount. The original approach using
 #   'fudge' factors wasn't reliable and the script would finish even though the SMART
 #   self-tests had not completed. The new polling code helps insure that this doesn't
 #   happen.
-#   
+#
 #   Fixed code to work around annoying differences between sed's behavior on Linux and
 #   FreeBSD.
 #
@@ -121,7 +121,7 @@
 #   Modified parsing of short and extended test durations to accommodate the values
 #   returned by larger drives; we needed to strip out the '(' and ')' characters
 #   surrounding the integer value in order to fetch it reliably.
-# 
+#
 ########################################################################
 
 #if [ $# -ne 1 ]; then
@@ -145,11 +145,12 @@ readonly cyan=$(tput setaf 6)
 readonly white=$(tput setaf 7)
 
 display_usage() {
-cat <<EOF
+  cat <<EOF
 
 Usage: ${SCRIPT_NAME} [-r] <disk>
 
 ${bold}-r${normal}|    Perform tests on the disk.
+${bold}-b${normal}|    Skip Extended Disk Test.
 ${bold}-h${normal}|    Print this help message.
 
 Example 1: ${bold}${blue}By default the script runs in 'dry run mode' to check the sleep duration calculations and to insure that the sequence of commands suits your needs.${normal}
@@ -160,36 +161,42 @@ Example 2: ${bold}${blue}Perform tests on the disk.${normal}
 EOF
 }
 
-while getopts "hr" OPTION ; do
-    case ${OPTION} in
-        r) run=true;;
-        h) display_usage; exit 1;;
-        \?) display_usage; exit 1;;
-    esac
+while getopts "hrb" OPTION; do
+  case ${OPTION} in
+  r) run=true ;;
+  b) BADBLOCKS_ONLY=true ;;
+  h)
+    display_usage
+    exit 1
+    ;;
+  \?)
+    display_usage
+    exit 1
+    ;;
+  esac
 done
 
-shift $((OPTIND-1))
+shift $((OPTIND - 1))
 
-if  [[ ! "${run}" ]] ; then
-  Dry_Run=1;
+if [[ ! "${run}" ]]; then
+  Dry_Run=1
 else
-  Dry_Run=0;
+  Dry_Run=0
 fi
-
 
 Drive="${@}"
 
-if  [[ ! "${Drive}" ]] ; then
-  display_usage; exit 2;
+if [[ ! "${Drive}" ]]; then
+  display_usage
+  exit 2
 fi
-
 
 # Set Dry_Run to a non-zero value to test out the script without actually
 # running any tests: set it to zero when you are ready to burn-in disks.
 
 #Dry_Run=1
 
-# Directory specifiers for log and badblocks data files. Leave off the 
+# Directory specifiers for log and badblocks data files. Leave off the
 # trailing slash:
 
 Log_Dir="/var/log/disk-burnin"
@@ -231,14 +238,14 @@ Short_Test_Minutes=$(smartctl -c /dev/"$Drive" | pcregrep -M "Short self-test ro
 Extended_Test_Minutes=$(smartctl -c /dev/"$Drive" | pcregrep -M "Extended self-test routine.*\n.*recommended polling time:" | sed -e 's/)//;s/(//' | awk '{print $4}' | tr -d '\n')
 #printf "Extended_Test_Minutes=[%s]\n" ${Extended_Test_Minutes}
 
-Short_Test_Sleep=$((Short_Test_Minutes*60))
-Extended_Test_Sleep=$((Extended_Test_Minutes*60))
+Short_Test_Sleep=$((Short_Test_Minutes * 60))
+Extended_Test_Sleep=$((Extended_Test_Minutes * 60))
 
 # Selftest polling timeout interval, in hours
 Poll_Timeout_Hours=4
 
 # Calculate the selftest polling timeout interval in seconds
-Poll_Timeout=$((Poll_Timeout_Hours*60*60))
+Poll_Timeout=$((Poll_Timeout_Hours * 60 * 60))
 
 # Polling sleep interval, in seconds:
 Poll_Interval=15
@@ -249,37 +256,33 @@ Poll_Interval=15
 #
 ########################################################################
 
-echo_str()
-{
+echo_str() {
   echo "$1" | tee -a "$Log_File"
 }
 
-push_header()
-{
+push_header() {
   echo_str "+-----------------------------------------------------------------------------"
 }
 
-poll_selftest_complete()
-{
+poll_selftest_complete() {
   l_rv=1
   l_status=0
   l_done=0
   l_pollduration=0
 
-# Check SMART results for "The previous self-test routine completed"
-# Return 0 if the test has completed, 1 if we exceed our polling timeout interval
+  # Check SMART results for "The previous self-test routine completed"
+  # Return 0 if the test has completed, 1 if we exceed our polling timeout interval
 
-  while [ $l_done -eq 0 ];
-  do  
-    smartctl -a /dev/"$Drive" | grep -i "The previous self-test routine completed" > /dev/null 2<&1
+  while [ $l_done -eq 0 ]; do
+    smartctl -a /dev/"$Drive" | grep -i "The previous self-test routine completed" >/dev/null 2<&1
     l_status=$?
     if [ $l_status -eq 0 ]; then
       echo_str "SMART self-test complete"
       l_rv=0
       l_done=1
     else
-      # Check for failure    
-      smartctl -a /dev/"$Drive" | grep -i "of the test failed." > /dev/null 2<&1
+      # Check for failure
+      smartctl -a /dev/"$Drive" | grep -i "of the test failed." >/dev/null 2<&1
       l_status=$?
       if [ $l_status -eq 0 ]; then
         echo_str "SMART self-test failed"
@@ -291,17 +294,16 @@ poll_selftest_complete()
           l_done=1
         else
           sleep ${Poll_Interval}
-          l_pollduration=$((l_pollduration+Poll_Interval))
+          l_pollduration=$((l_pollduration + Poll_Interval))
         fi
       fi
     fi
   done
 
   return $l_rv
-} 
+}
 
-run_short_test()
-{
+run_short_test() {
   push_header
   echo_str "+ Run SMART short test on drive /dev/${Drive}: $(date)"
   push_header
@@ -317,8 +319,7 @@ run_short_test()
   echo_str "Finished SMART short test on drive /dev/${Drive}: $(date)"
 }
 
-run_extended_test()
-{
+run_extended_test() {
   push_header
   echo_str "+ Run SMART extended test on drive /dev/${Drive}: $(date)"
   push_header
@@ -334,15 +335,14 @@ run_extended_test()
   echo_str "Finished SMART extended test on drive /dev/${Drive}: $(date)"
 }
 
-run_badblocks_test()
-{
+run_badblocks_test() {
   push_header
   echo_str "+ Run badblocks test on drive /dev/${Drive}: $(date)"
   push_header
   if [ "${Dry_Run}" -eq 0 ]; then
-#
-#   This is the command which erases all data on the disk:
-#
+    #
+    #   This is the command which erases all data on the disk:
+    #
     badblocks -b 4096 -wsv -o "$BB_File" /dev/"$Drive"
   else
     echo_str "Dry run: would run badblocks -b 4096 -wsv -o ${BB_File} /dev/${Drive}"
@@ -356,58 +356,66 @@ run_badblocks_test()
 #
 ########################################################################
 
-if [ -e "$Log_File" ]; then
-  rm "$Log_File"
-fi
+main() {
+  if [ -e "$Log_File" ]; then
+    rm "$Log_File"
+  fi
 
-push_header
-echo_str "+ Started burn-in of /dev/${Drive} : $(date)"
-push_header
+  push_header
+  echo_str "+ Started burn-in of /dev/${Drive} : $(date)"
+  push_header
 
-echo_str "Host: $(hostname)"
-echo_str "Drive Model: ${Disk_Model}"
-echo_str "Serial Number: ${Serial_Number}"
-echo_str "Short test duration: ${Short_Test_Minutes} minutes"
-echo_str "Short test sleep duration: ${Short_Test_Sleep} seconds"
-echo_str "Extended test duration: ${Extended_Test_Minutes} minutes"
-echo_str "Extended test sleep duration: ${Extended_Test_Sleep} seconds"
-echo_str "Log file: ${Log_File}"
-echo_str "Bad blocks file: ${BB_File}"
+  echo_str "Host: $(hostname)"
+  echo_str "Drive Model: ${Disk_Model}"
+  echo_str "Serial Number: ${Serial_Number}"
+  echo_str "Short test duration: ${Short_Test_Minutes} minutes"
+  echo_str "Short test sleep duration: ${Short_Test_Sleep} seconds"
+  echo_str "Extended test duration: ${Extended_Test_Minutes} minutes"
+  echo_str "Extended test sleep duration: ${Extended_Test_Sleep} seconds"
+  echo_str "Log file: ${Log_File}"
+  echo_str "Bad blocks file: ${BB_File}"
 
-# Run the test sequence:
-run_short_test
-run_extended_test
-run_badblocks_test
-run_short_test
-run_extended_test
+  # Run the test sequence:
+  if [[ ! "${BADBLOCKS_ONLY}" ]]; then
+    run_short_test
+    run_badblocks_test
+    run_short_test
+    run_extended_test
+  else
+    run_short_test
+    run_extended_test
+    run_badblocks_test
+    run_short_test
+    run_extended_test
+  fi
 
-# Emit full device information to log:
-push_header
-echo_str "+ SMART information for drive /dev/${Drive}: $(date)"
-push_header
-smartctl -x /dev/"$Drive" | tee -a "$Log_File"
+  # Emit full device information to log:
+  push_header
+  echo_str "+ SMART information for drive /dev/${Drive}: $(date)"
+  push_header
+  smartctl -x /dev/"$Drive" | tee -a "$Log_File"
 
-push_header
-echo_str "+ Finished burn-in of /dev/${Drive} : $(date)"
-push_header
+  push_header
+  echo_str "+ Finished burn-in of /dev/${Drive} : $(date)"
+  push_header
 
-# Clean up the log file:
+  # Clean up the log file:
 
-osflavor=$(uname)
+  osflavor=$(uname)
 
-if [ "${osflavor}" = "Linux" ]; then
-  sed -i -e '/Copyright/d' "${Log_File}"
-  sed -i -e '/=== START OF READ/d' "${Log_File}"
-  sed -i -e '/SMART Attributes Data/d' "${Log_File}"
-  sed -i -e '/Vendor Specific SMART/d' "${Log_File}"
-  sed -i -e '/SMART Error Log Version/d' "${Log_File}"
-fi
+  if [ "${osflavor}" = "Linux" ]; then
+    sed -i -e '/Copyright/d' "${Log_File}"
+    sed -i -e '/=== START OF READ/d' "${Log_File}"
+    sed -i -e '/SMART Attributes Data/d' "${Log_File}"
+    sed -i -e '/Vendor Specific SMART/d' "${Log_File}"
+    sed -i -e '/SMART Error Log Version/d' "${Log_File}"
+  fi
 
-if [ "${osflavor}" = "FreeBSD" ]; then
-  sed -i '' -e '/Copyright/d' "${Log_File}"
-  sed -i '' -e '/=== START OF READ/d' "${Log_File}"
-  sed -i '' -e '/SMART Attributes Data/d' "${Log_File}"
-  sed -i '' -e '/Vendor Specific SMART/d' "${Log_File}"
-  sed -i '' -e '/SMART Error Log Version/d' "${Log_File}"
-fi
-
+  if [ "${osflavor}" = "FreeBSD" ]; then
+    sed -i '' -e '/Copyright/d' "${Log_File}"
+    sed -i '' -e '/=== START OF READ/d' "${Log_File}"
+    sed -i '' -e '/SMART Attributes Data/d' "${Log_File}"
+    sed -i '' -e '/Vendor Specific SMART/d' "${Log_File}"
+    sed -i '' -e '/SMART Error Log Version/d' "${Log_File}"
+  fi
+}
