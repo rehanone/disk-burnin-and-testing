@@ -419,3 +419,5 @@ main() {
     sed -i '' -e '/SMART Error Log Version/d' "${Log_File}"
   fi
 }
+
+[[ "$0" == "$BASH_SOURCE" ]] && main "$@"
