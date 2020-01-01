@@ -378,12 +378,12 @@ main() {
   # Run the test sequence:
   if [[ ! "${BADBLOCKS_ONLY}" ]]; then
     run_short_test
+    run_extended_test
     run_badblocks_test
     run_short_test
     run_extended_test
   else
     run_short_test
-    run_extended_test
     run_badblocks_test
     run_short_test
     run_extended_test
